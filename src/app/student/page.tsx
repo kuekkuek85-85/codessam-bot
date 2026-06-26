@@ -14,7 +14,7 @@ import type {
   StudentState,
   ThoughtGate,
 } from "@/lib/types";
-import { SITE } from "@/lib/config";
+import { SITE, ACTIVE_LEVELS } from "@/lib/config";
 
 import EthicsGate from "@/components/student/EthicsGate";
 import LevelSelect from "@/components/student/LevelSelect";
@@ -177,11 +177,12 @@ export default function StudentPage() {
       finalDraft,
       completedAt: Date.now(),
     });
-    // 다음 난이도 해금
+    // 다음 난이도 해금 (단, 이번 데모에서 열어둔 난이도만)
     const order: Level[] = ["하", "중", "상"];
     const idx = order.indexOf(mission.level);
     const unlocked = new Set(student.unlockedLevels);
-    if (idx >= 0 && idx < order.length - 1) unlocked.add(order[idx + 1]);
+    const next = idx >= 0 && idx < order.length - 1 ? order[idx + 1] : null;
+    if (next && ACTIVE_LEVELS.includes(next)) unlocked.add(next);
     await touch("완성·도전중", { unlockedLevels: Array.from(unlocked) });
   }
 

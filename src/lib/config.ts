@@ -3,6 +3,8 @@
 // 배포 시 이 파일만 수정하면 푸터·처리방침 전체가 바뀝니다.
 // ─────────────────────────────────────────────────────────────
 
+import type { Level } from "./types";
+
 export const SITE = {
   appName: "코드쌤봇 2.0",
   schoolName: "장평중학교",
@@ -29,3 +31,10 @@ export const TOO_FAST_MIN = 3;
 /** 데모 모드 교사/학생 접속 코드. 실서비스에선 세션별로 발급. */
 export const DEMO_TEACHER_CODE = "1234";
 export const DEMO_ACCESS_CODE = "demo";
+
+/**
+ * 이번에 열어 둘 난이도. 여기에 없는 난이도는 항상 잠금(🔒)이고
+ * 완성해도 해금되지 않는다. (현재: 하만 데모 시연)
+ * 전체를 다시 열려면 ["하","중","상"]으로 바꾸면 된다.
+ */
+export const ACTIVE_LEVELS: Level[] = ["하"];

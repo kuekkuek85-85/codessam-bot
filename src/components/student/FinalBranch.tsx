@@ -4,6 +4,7 @@ import { useState } from "react";
 import GuardedTextarea from "./GuardedTextarea";
 import { askAi } from "@/lib/ai-client";
 import { db, uid, nextLevel } from "@/lib/db";
+import { ACTIVE_LEVELS } from "@/lib/config";
 import type { Attempt, AttemptMode, Mission, Student } from "@/lib/types";
 
 // 화면 5. 최종본 / 분기 (AI 역할 사다리) — PRD §5, §3.1
@@ -28,7 +29,8 @@ export default function FinalBranch({
   const [aiText, setAiText] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const unlocked = nextLevel(mission.level);
+  const next = nextLevel(mission.level);
+  const unlocked = next && ACTIVE_LEVELS.includes(next) ? next : null;
 
   function submit() {
     onSubmitFinal(draft);

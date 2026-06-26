@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Level, Student } from "@/lib/types";
 import { LEVELS } from "@/lib/types";
+import { ACTIVE_LEVELS } from "@/lib/config";
 
 // 화면 1. 난이도 자기선택 (자기선택 + 완성 시 해금) — PRD §5
 const META: Record<Level, { emoji: string; desc: string; tone: string }> = {
@@ -76,7 +77,8 @@ export default function LevelSelect({
 
       <div className="grid gap-4 sm:grid-cols-3">
         {LEVELS.map((lv) => {
-          const unlocked = student.unlockedLevels.includes(lv);
+          const active = ACTIVE_LEVELS.includes(lv);
+          const unlocked = active && student.unlockedLevels.includes(lv);
           const m = META[lv];
           return (
             <button
@@ -100,7 +102,9 @@ export default function LevelSelect({
               <p className="mt-1 text-sm text-slate-600">{m.desc}</p>
               {!unlocked && (
                 <p className="mt-2 text-xs text-slate-400">
-                  아래 난이도를 완성하면 열려요
+                  {active
+                    ? "아래 난이도를 완성하면 열려요"
+                    : "이번 데모에서는 잠겨 있어요"}
                 </p>
               )}
             </button>
