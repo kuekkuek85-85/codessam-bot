@@ -40,6 +40,7 @@ export default function AiHelp({
       answerText: mission.answerText,
       bugPoints: mission.bugPoints,
       thoughtGate: attempt.thoughtGate,
+      imageDataUrl: attempt.imageUrl || undefined,
     });
     setBubbles((b) => [...b, { level: lv, text, source }]);
     // 로그 기록 (PRD §8 messages)
@@ -76,6 +77,17 @@ export default function AiHelp({
         <p>• 하고 싶었던 것: {attempt.thoughtGate.wanted}</p>
         <p>• 실제로 한 것: {attempt.thoughtGate.did}</p>
         <p>• 일어난 일: {attempt.thoughtGate.happened}</p>
+        {attempt.imageUrl && (
+          <div className="mt-2">
+            <span className="font-semibold text-slate-500">• 첨부 캡처:</span>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={attempt.imageUrl}
+              alt="첨부 캡처"
+              className="mt-1 max-h-40 rounded-lg ring-1 ring-slate-200"
+            />
+          </div>
+        )}
       </div>
 
       <div className="card">

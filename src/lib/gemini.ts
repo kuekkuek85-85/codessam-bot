@@ -16,6 +16,7 @@ export interface AiRequest {
   thoughtGate?: ThoughtGate;
   studentSolution?: string; // verify 모드: 학생 풀이
   missionTitle?: string;
+  imageDataUrl?: string; // 학생이 첨부한 문제 상황 캡처(data URL)
 }
 
 const HINT_STEP_NAME = ["방향", "어디 볼까", "구체 힌트", "같이 풀기"];
@@ -37,6 +38,7 @@ export function buildSystemPrompt(req: AiRequest): string {
 - 지금은 정확히 ${lv}단계 수준까지만 공개하세요. 그 이상 미리 알려주지 마세요.
 - 틀린 빈칸/블록을 '하나만' 짚습니다.
 - 되묻기 우선: "왜 그렇게 생각했어?", "그 블록은 언제 실행돼?"
+- 학생이 문제 상황 캡처 이미지를 첨부했다면 그 화면(블록 배치·실행 결과)을 참고해 더 구체적으로 짚어라. 단 이미지가 있어도 정답 블록을 통째로 알려주지 마라.
 
 [미션 정답(교사용, 학생에게 노출 금지)]
 ${req.answerText ?? "(없음)"}

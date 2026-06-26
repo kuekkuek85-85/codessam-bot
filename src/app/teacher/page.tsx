@@ -427,6 +427,17 @@ function StudentCard({
               {detail.lastHint.length > 80 ? "…" : ""}
             </p>
           )}
+          {detail?.attempt?.imageUrl && (
+            <div className="border-t border-slate-200 pt-1">
+              <b>최근 캡처:</b>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={detail.attempt.imageUrl}
+                alt="학생 캡처"
+                className="mt-1 max-h-36 rounded ring-1 ring-slate-200"
+              />
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -38,13 +38,22 @@ export async function POST(req: Request) {
         ? "검증 도전을 제시해줘."
         : "도전 과제를 만들어줘.";
 
+    // 사용자 턴: 텍스트 + (있으면) 첨부 캡처 이미지(비전)
+    const parts: Array<Record<string, unknown>> = [{ text: userTurn }];
+    const inline = body.imageDataUrl
+      ? /^data:([^;]+);base64,(.+)$/.exec(body.imageDataUrl)
+      : null;
+    if (inline) {
+      parts.push({ inlineData: { mimeType: inline[1], data: inline[2] } });
+    }
+
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`;
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
-        contents: [{ role: "user", parts: [{ text: userTurn }] }],
+        contents: [{ role: "user", parts }],
         generationConfig: {
           temperature: 0.7,
           maxOutputTokens: 500,

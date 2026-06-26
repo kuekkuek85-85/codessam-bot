@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import GuardedTextarea from "./GuardedTextarea";
+import ImageCapture from "./ImageCapture";
 import type { Attempt, Mission, Student, ThoughtGate } from "@/lib/types";
 
 // 화면 2. 미션 + 생각 게이트 (★ HITL 핵심) — PRD §5
@@ -12,6 +13,7 @@ export default function MissionThoughtGate({
   onStart,
   onSave,
   onSubmit,
+  onImageChange,
 }: {
   student: Student;
   mission: Mission;
@@ -19,10 +21,14 @@ export default function MissionThoughtGate({
   onStart: () => void;
   onSave: (tg: ThoughtGate) => void;
   onSubmit: (tg: ThoughtGate) => void;
+  onImageChange: (dataUrl?: string) => void;
 }) {
   const [started, setStarted] = useState<boolean>(!!attempt);
   const [tg, setTg] = useState<ThoughtGate>(
     attempt?.thoughtGate ?? { wanted: "", did: "", happened: "" }
+  );
+  const [image, setImage] = useState<string | undefined>(
+    attempt?.imageUrl || undefined
   );
 
   const filled =
@@ -123,6 +129,14 @@ export default function MissionThoughtGate({
               placeholder="예: 숫자가 줄지 않고 계속 늘어나기만 해"
             />
           </div>
+
+          <ImageCapture
+            value={image}
+            onChange={(dataUrl) => {
+              setImage(dataUrl);
+              onImageChange(dataUrl);
+            }}
+          />
         </div>
 
         <button

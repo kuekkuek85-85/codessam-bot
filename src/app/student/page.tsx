@@ -139,6 +139,15 @@ export default function StudentPage() {
     await touch("혼자푸는중");
   }
 
+  async function saveImage(dataUrl?: string) {
+    if (!attempt) return;
+    const next = { ...attempt, imageUrl: dataUrl };
+    setAttempt(next);
+    // RTDB는 undefined를 거부하므로 삭제 시 빈 문자열로 저장.
+    await db().updateAttempt(attempt.id, { imageUrl: dataUrl ?? "" });
+    await touch("혼자푸는중");
+  }
+
   async function onGateSubmitted(tg: ThoughtGate) {
     await saveThoughtGate(tg);
     setStep(3);
@@ -261,6 +270,7 @@ export default function StudentPage() {
             onStart={onMissionStart}
             onSave={saveThoughtGate}
             onSubmit={onGateSubmitted}
+            onImageChange={saveImage}
           />
         )}
 
