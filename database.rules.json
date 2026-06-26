@@ -20,6 +20,11 @@
       ".write": true,
       ".indexOn": ["studentId"]
     },
+    "attemptImages": {
+      "//": "캡처 이미지(data URL)를 attempt 본문과 분리 저장 — 대시보드 재다운로드 방지",
+      ".read": true,
+      ".write": true
+    },
     "messages": {
       ".read": true,
       ".write": true,

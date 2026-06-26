@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import Footer from "@/components/Footer";
 import { db, STATE_STYLE } from "@/lib/db";
@@ -17,6 +17,7 @@ import type { Attempt, Student, StudentState, Warning } from "@/lib/types";
 interface Detail {
   attempt: Attempt | null;
   lastHint: string | null;
+  image: string | null;
 }
 
 const STUCK_ORDER: Record<StudentState, number> = {
@@ -54,21 +55,45 @@ export default function TeacherPage() {
     };
   }, [authed]);
 
-  // 학생별 상세(생각 게이트·마지막 힌트) 로드
+  // 학생별 상세(생각 게이트·마지막 힌트·캡처) 로드 — 무료 한도 보호 캐시.
+  // ① 변경된 학생만 메타 재조회(한 명 움직여도 30명 전부 다시 안 읽음)
+  // ② 캡처 이미지는 attemptId별 1회만 다운로드 후 캐시(재다운로드 방지)
+  const detailsRef = useRef<Record<string, Detail>>({});
+  const sigRef = useRef<Record<string, string>>({});
+  const imgCacheRef = useRef<Record<string, string>>({});
   useEffect(() => {
     if (!authed || students.length === 0) return;
     let cancelled = false;
     (async () => {
-      const entries = await Promise.all(
-        students.map(async (s) => {
+      const changed = students.filter(
+        (s) =>
+          sigRef.current[s.id] !==
+          `${s.currentMissionId ?? ""}|${s.lastActiveAt}`
+      );
+      if (changed.length === 0) return;
+      await Promise.all(
+        changed.map(async (s) => {
           const [attempt, lastHint] = await Promise.all([
             db().latestAttempt(s.id),
             db().lastAiHint(s.id),
           ]);
-          return [s.id, { attempt, lastHint }] as const;
+          let image: string | null = null;
+          if (attempt) {
+            if (imgCacheRef.current[attempt.id]) {
+              image = imgCacheRef.current[attempt.id];
+            } else {
+              // null이면 캐시하지 않음 — 학생이 나중에 첨부하면 다음에 잡힘.
+              image = await db().getAttemptImage(attempt.id);
+              if (image) imgCacheRef.current[attempt.id] = image;
+            }
+          }
+          detailsRef.current[s.id] = { attempt, lastHint, image };
+          sigRef.current[s.id] = `${s.currentMissionId ?? ""}|${
+            s.lastActiveAt
+          }`;
         })
       );
-      if (!cancelled) setDetails(Object.fromEntries(entries));
+      if (!cancelled) setDetails({ ...detailsRef.current });
     })();
     return () => {
       cancelled = true;
@@ -371,7 +396,7 @@ function StudentCard({
   const style = STATE_STYLE[state];
   const mins = minutesSince(student.lastActiveAt, now);
   const tg = detail?.attempt?.thoughtGate;
-  const capture = detail?.attempt?.imageUrl;
+  const capture = detail?.image ?? undefined;
   const completed = detail?.attempt?.completedAt;
   const startMins = detail?.attempt
     ? minutesSince(detail.attempt.startedAt, now)

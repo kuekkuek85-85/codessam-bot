@@ -46,6 +46,14 @@ export interface DB {
   latestAttempt(studentId: string): Promise<Attempt | null>;
   lastAiHint(studentId: string): Promise<string | null>;
 
+  /**
+   * 캡처 이미지는 attempt 본문과 분리된 경로에 저장한다.
+   * 교사 대시보드가 attempt 메타를 자주 다시 읽어도 무거운 이미지
+   * 바이트를 재다운로드하지 않도록(무료 한도 보호) 하기 위함.
+   */
+  setAttemptImage(attemptId: string, dataUrl: string): Promise<void>;
+  getAttemptImage(attemptId: string): Promise<string | null>;
+
   addMessage(m: Message): Promise<void>;
   listMessages(attemptId: string): Promise<Message[]>;
 
@@ -77,10 +85,18 @@ interface Store {
   attempts: Attempt[];
   messages: Message[];
   warnings: Warning[];
+  images: Record<string, string>; // attemptId -> data URL
 }
 
 function emptyStore(): Store {
-  return { missions: [], students: [], attempts: [], messages: [], warnings: [] };
+  return {
+    missions: [],
+    students: [],
+    attempts: [],
+    messages: [],
+    warnings: [],
+    images: {},
+  };
 }
 
 class LocalDB implements DB {
@@ -205,6 +221,16 @@ class LocalDB implements DB {
     return rows[0]?.text ?? null;
   }
 
+  async setAttemptImage(attemptId: string, dataUrl: string) {
+    const s = this.read();
+    if (dataUrl) s.images[attemptId] = dataUrl;
+    else delete s.images[attemptId];
+    this.write(s);
+  }
+  async getAttemptImage(attemptId: string) {
+    return this.read().images[attemptId] ?? null;
+  }
+
   async addMessage(m: Message) {
     const s = this.read();
     s.messages.push(m);
@@ -254,10 +280,14 @@ class LocalDB implements DB {
     const removedIds = new Set(
       s.students.filter((x) => x.sessionId === sessionId).map((x) => x.id)
     );
+    const removedAttempts = s.attempts
+      .filter((a) => removedIds.has(a.studentId))
+      .map((a) => a.id);
     s.students = keepStudents;
     s.attempts = s.attempts.filter((a) => !removedIds.has(a.studentId));
     s.messages = s.messages.filter((m) => !removedIds.has(m.studentId));
     s.warnings = s.warnings.filter((w) => !removedIds.has(w.studentId));
+    for (const aid of removedAttempts) delete s.images[aid];
     this.write(s);
   }
 }
@@ -382,6 +412,18 @@ class RealtimeDB implements DB {
     return rows[0]?.text ?? null;
   }
 
+  async setAttemptImage(attemptId: string, dataUrl: string) {
+    const { db, ref, set, remove } = await this.rt();
+    // 무거운 이미지는 attempt와 분리된 경로에 저장(대시보드 재다운로드 방지).
+    if (dataUrl) await set(ref(db, `attemptImages/${attemptId}`), dataUrl);
+    else await remove(ref(db, `attemptImages/${attemptId}`));
+  }
+  async getAttemptImage(attemptId: string) {
+    const { db, ref, get } = await this.rt();
+    const snap = await get(ref(db, `attemptImages/${attemptId}`));
+    return snap.exists() ? (snap.val() as string) : null;
+  }
+
   async addMessage(m: Message) {
     const { db, ref, set } = await this.rt();
     await set(ref(db, `messages/${m.id}`), m);
@@ -443,6 +485,7 @@ class RealtimeDB implements DB {
     for (const s of students) {
       if (s.sessionId === sessionId) updates[`students/${s.id}`] = null;
     }
+    const removedAttemptIds: string[] = [];
     for (const coll of ["attempts", "messages", "warnings"] as const) {
       const rows = await this.readColl<{ id: string; studentId?: string }>(
         coll
@@ -450,9 +493,12 @@ class RealtimeDB implements DB {
       for (const row of rows) {
         if (row.studentId && ids.has(row.studentId)) {
           updates[`${coll}/${row.id}`] = null;
+          if (coll === "attempts") removedAttemptIds.push(row.id);
         }
       }
     }
+    // 분리 저장된 캡처 이미지도 함께 삭제
+    for (const aid of removedAttemptIds) updates[`attemptImages/${aid}`] = null;
     await update(ref(db), updates);
   }
 }

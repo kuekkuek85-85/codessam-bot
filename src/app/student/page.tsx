@@ -141,10 +141,11 @@ export default function StudentPage() {
 
   async function saveImage(dataUrl?: string) {
     if (!attempt) return;
+    // 이미지는 학생 세션의 로컬 상태에 유지(AiHelp가 바로 표시·전송)하되,
+    // DB에는 attempt 본문과 분리된 경로에 저장한다(대시보드 재다운로드 방지).
     const next = { ...attempt, imageUrl: dataUrl };
     setAttempt(next);
-    // RTDB는 undefined를 거부하므로 삭제 시 빈 문자열로 저장.
-    await db().updateAttempt(attempt.id, { imageUrl: dataUrl ?? "" });
+    await db().setAttemptImage(attempt.id, dataUrl ?? "");
     await touch("혼자푸는중");
   }
 
