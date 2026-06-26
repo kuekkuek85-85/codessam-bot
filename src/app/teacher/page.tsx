@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import Footer from "@/components/Footer";
 import { db, STATE_STYLE } from "@/lib/db";
@@ -12,7 +12,14 @@ import {
   TOO_FAST_MIN,
   SITE,
 } from "@/lib/config";
-import type { Attempt, Student, StudentState, Warning } from "@/lib/types";
+import type {
+  Attempt,
+  AttemptMode,
+  Message,
+  Student,
+  StudentState,
+  Warning,
+} from "@/lib/types";
 
 interface Detail {
   attempt: Attempt | null;
@@ -39,6 +46,7 @@ export default function TeacherPage() {
   const [now, setNow] = useState<number>(0);
   const [demo, setDemo] = useState(true);
   const [zoomSrc, setZoomSrc] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authed) return;
@@ -343,17 +351,33 @@ export default function TeacherPage() {
                 now={n}
                 detail={details[s.id]}
                 warned={warnedStudentIds.has(s.id)}
-                onZoom={setZoomSrc}
+                onOpen={setSelectedId}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* 캡처 확대 보기 (라이트박스) */}
+      {/* 학생 상세 활동 내역 모달 */}
+      {selectedId &&
+        (() => {
+          const stu = students.find((x) => x.id === selectedId);
+          if (!stu) return null;
+          return (
+            <StudentDetailModal
+              student={stu}
+              state={effectiveState(stu, n)}
+              now={n}
+              onClose={() => setSelectedId(null)}
+              onZoom={setZoomSrc}
+            />
+          );
+        })()}
+
+      {/* 캡처 확대 보기 (라이트박스) — 모달보다 위 */}
       {zoomSrc && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-6"
           onClick={() => setZoomSrc(null)}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -400,14 +424,14 @@ function StudentCard({
   now,
   detail,
   warned,
-  onZoom,
+  onOpen,
 }: {
   student: Student;
   state: StudentState;
   now: number;
   detail?: Detail;
   warned: boolean;
-  onZoom: (src: string) => void;
+  onOpen: (id: string) => void;
 }) {
   const style = STATE_STYLE[state];
   const mins = minutesSince(student.lastActiveAt, now);
@@ -434,24 +458,37 @@ function StudentCard({
 
   return (
     <div
-      className={`rounded-2xl bg-white p-4 ring-1 transition ${
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpen(student.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") onOpen(student.id);
+      }}
+      className={`w-full cursor-pointer rounded-2xl bg-white p-4 text-left ring-1 transition hover:-translate-y-0.5 hover:shadow-md ${
         warned ? "ring-2 ring-red-400" : "ring-slate-200"
       }`}
+      title="클릭해 활동 내역 보기"
     >
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-2">
         <div>
           <div className="font-bold text-slate-900">
             {student.studentNo} {student.name}
           </div>
           <div className="text-xs text-slate-400">
-            난이도 {student.currentLevel} · 해금{" "}
-            {student.unlockedLevels.join("·")}
+            난이도 {student.currentLevel}
           </div>
         </div>
-        <span className={`pill ${style.bg} ${style.text}`}>
-          <span className={`h-2 w-2 rounded-full ${style.dot}`} />
-          {state}
-        </span>
+        <div className="flex flex-col items-end gap-1">
+          <span className={`pill ${style.bg} ${style.text}`}>
+            <span className={`h-2 w-2 rounded-full ${style.dot}`} />
+            {state}
+          </span>
+          {completed && (
+            <span className="pill bg-emerald-100 text-emerald-700">
+              ✓ 완료
+            </span>
+          )}
+        </div>
       </div>
 
       <div className="mt-2 text-xs text-slate-400">
@@ -459,24 +496,19 @@ function StudentCard({
         {startMins !== null && ` · 시작 후 ${startMins}분`}
       </div>
 
-      {/* 캡처 썸네일 — 상태와 무관하게 항상 표시, 클릭 시 확대 */}
+      {/* 캡처 미리보기 — 카드 클릭 시 상세에서 확대 가능 */}
       {capture && (
-        <button
-          type="button"
-          onClick={() => onZoom(capture)}
-          className="group relative mt-2 block w-full overflow-hidden rounded-lg ring-1 ring-slate-200"
-          title="클릭해 크게 보기"
-        >
+        <div className="relative mt-2 overflow-hidden rounded-lg ring-1 ring-slate-200">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={capture}
             alt="학생 캡처"
-            className="max-h-40 w-full object-cover transition group-hover:opacity-90"
+            className="max-h-40 w-full object-cover"
           />
           <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">
             🔍 캡처
           </span>
-        </button>
+        </div>
       )}
 
       {warned && (
@@ -519,4 +551,242 @@ function StudentCard({
       )}
     </div>
   );
+}
+
+const MODE_LABEL: Record<AttemptMode, string> = {
+  solve: "풀이",
+  verify: "AI 검증(검사)",
+  challenge: "도전 과제",
+};
+const HINT_STEP = ["방향", "어디 볼까", "구체 힌트", "같이 풀기"];
+
+function fmtTime(ts: number): string {
+  try {
+    return new Date(ts).toLocaleString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
+// 학생 클릭 시: 단계별 활동 내역 전체를 보여주는 모달.
+function StudentDetailModal({
+  student,
+  state,
+  now,
+  onClose,
+  onZoom,
+}: {
+  student: Student;
+  state: StudentState;
+  now: number;
+  onClose: () => void;
+  onZoom: (src: string) => void;
+}) {
+  const [attempt, setAttempt] = useState<Attempt | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [image, setImage] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      const a = await db().latestAttempt(student.id);
+      const [msgs, img] = await Promise.all([
+        a ? db().listMessages(a.id) : Promise.resolve([]),
+        a ? db().getAttemptImage(a.id) : Promise.resolve(null),
+      ]);
+      if (!cancelled) {
+        setAttempt(a);
+        setMessages(msgs);
+        setImage(img);
+        setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [student.id]);
+
+  const style = STATE_STYLE[state];
+  const tg = attempt?.thoughtGate;
+
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* 헤더 */}
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-xl font-bold text-slate-900">
+              {student.studentNo} {student.name}
+            </h2>
+            <p className="mt-0.5 text-sm text-slate-500">
+              난이도 {student.currentLevel} · 마지막 활동{" "}
+              {minutesSince(student.lastActiveAt, now)}분 전
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <span className={`pill ${style.bg} ${style.text}`}>
+              <span className={`h-2 w-2 rounded-full ${style.dot}`} />
+              {state}
+            </span>
+            {attempt?.completedAt && (
+              <span className="pill bg-emerald-100 text-emerald-700">
+                ✓ 완료
+              </span>
+            )}
+          </div>
+        </div>
+
+        {loading ? (
+          <p className="mt-6 text-center text-slate-400">불러오는 중…</p>
+        ) : !attempt ? (
+          <p className="mt-6 text-center text-slate-400">
+            아직 미션을 시작하지 않았어요.
+          </p>
+        ) : (
+          <div className="mt-5 space-y-4">
+            {/* 진행 메타 */}
+            <div className="flex flex-wrap gap-2 text-xs">
+              <span className="pill bg-slate-100 text-slate-600">
+                모드: {MODE_LABEL[attempt.mode]}
+              </span>
+              <span className="pill bg-slate-100 text-slate-600">
+                힌트 단계: {HINT_STEP[Math.min(3, attempt.hintLevel)]} (
+                {attempt.hintLevel}/3)
+              </span>
+              <span className="pill bg-slate-100 text-slate-600">
+                시작 {fmtTime(attempt.startedAt)}
+              </span>
+              {attempt.completedAt && (
+                <span className="pill bg-emerald-50 text-emerald-700">
+                  완료 {fmtTime(attempt.completedAt)}
+                </span>
+              )}
+            </div>
+
+            {/* 1. 생각 게이트 */}
+            <Section title="🚪 1. 생각 게이트">
+              {tg && (tg.wanted || tg.did || tg.happened) ? (
+                <div className="space-y-1 text-sm text-slate-700">
+                  <p>
+                    <b>하고 싶었던 것:</b> {tg.wanted || "—"}
+                  </p>
+                  <p>
+                    <b>실제로 한 것:</b> {tg.did || "—"}
+                  </p>
+                  <p>
+                    <b>일어난 일:</b> {tg.happened || "—"}
+                  </p>
+                </div>
+              ) : (
+                <Empty />
+              )}
+            </Section>
+
+            {/* 2. 첨부 캡처 */}
+            {image && (
+              <Section title="🖼️ 2. 첨부 캡처">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={image}
+                  alt="첨부 캡처"
+                  onClick={() => onZoom(image)}
+                  className="max-h-60 cursor-zoom-in rounded-lg ring-1 ring-slate-200"
+                />
+              </Section>
+            )}
+
+            {/* 3. AI 대화 */}
+            <Section title="🤖 3. AI 힌트·대화">
+              {messages.length === 0 ? (
+                <Empty />
+              ) : (
+                <div className="space-y-2">
+                  {messages.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`rounded-xl p-3 text-sm ${
+                        m.role === "ai"
+                          ? "bg-violet-50 text-slate-800"
+                          : "bg-slate-100 text-slate-700"
+                      }`}
+                    >
+                      <div className="mb-0.5 text-[11px] font-semibold text-slate-400">
+                        {m.role === "ai" ? "코드쌤봇" : "학생"} ·{" "}
+                        {fmtTime(m.createdAt)}
+                      </div>
+                      <p className="whitespace-pre-wrap leading-relaxed">
+                        {m.text}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Section>
+
+            {/* 4. 검토·수정 */}
+            <Section title="✏️ 4. 검토·수정">
+              {attempt.reviewGood || attempt.reviewFix ? (
+                <div className="space-y-1 text-sm text-slate-700">
+                  <p>
+                    <b>👍 AI에서 좋은 점:</b> {attempt.reviewGood || "—"}
+                  </p>
+                  <p>
+                    <b>🛠️ 내가 고칠 점:</b> {attempt.reviewFix || "—"}
+                  </p>
+                </div>
+              ) : (
+                <Empty />
+              )}
+            </Section>
+
+            {/* 5. 최종본 */}
+            <Section title="🏁 5. 최종본">
+              {attempt.finalDraft ? (
+                <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm text-slate-700">
+                  {attempt.finalDraft}
+                </p>
+              ) : (
+                <Empty />
+              )}
+            </Section>
+          </div>
+        )}
+
+        <button className="btn-primary mt-6 w-full" onClick={onClose}>
+          닫기
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div>
+      <h3 className="mb-1.5 text-sm font-bold text-slate-900">{title}</h3>
+      {children}
+    </div>
+  );
+}
+
+function Empty() {
+  return <p className="text-sm text-slate-400">아직 입력 없음</p>;
 }
