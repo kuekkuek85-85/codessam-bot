@@ -37,6 +37,7 @@ export default function TeacherPage() {
   const [details, setDetails] = useState<Record<string, Detail>>({});
   const [now, setNow] = useState<number>(0);
   const [demo, setDemo] = useState(true);
+  const [zoomSrc, setZoomSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authed) return;
@@ -301,11 +302,34 @@ export default function TeacherPage() {
                 now={n}
                 detail={details[s.id]}
                 warned={warnedStudentIds.has(s.id)}
+                onZoom={setZoomSrc}
               />
             ))}
           </div>
         )}
       </div>
+
+      {/* 캡처 확대 보기 (라이트박스) */}
+      {zoomSrc && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-6"
+          onClick={() => setZoomSrc(null)}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={zoomSrc}
+            alt="학생 캡처 확대"
+            className="max-h-[90vh] max-w-[90vw] rounded-xl shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            className="absolute right-6 top-6 rounded-full bg-white/90 px-4 py-2 font-semibold text-slate-800 shadow hover:bg-white"
+            onClick={() => setZoomSrc(null)}
+          >
+            ✕ 닫기
+          </button>
+        </div>
+      )}
 
       <Footer />
     </main>
@@ -335,16 +359,19 @@ function StudentCard({
   now,
   detail,
   warned,
+  onZoom,
 }: {
   student: Student;
   state: StudentState;
   now: number;
   detail?: Detail;
   warned: boolean;
+  onZoom: (src: string) => void;
 }) {
   const style = STATE_STYLE[state];
   const mins = minutesSince(student.lastActiveAt, now);
   const tg = detail?.attempt?.thoughtGate;
+  const capture = detail?.attempt?.imageUrl;
   const completed = detail?.attempt?.completedAt;
   const startMins = detail?.attempt
     ? minutesSince(detail.attempt.startedAt, now)
@@ -391,6 +418,26 @@ function StudentCard({
         {startMins !== null && ` · 시작 후 ${startMins}분`}
       </div>
 
+      {/* 캡처 썸네일 — 상태와 무관하게 항상 표시, 클릭 시 확대 */}
+      {capture && (
+        <button
+          type="button"
+          onClick={() => onZoom(capture)}
+          className="group relative mt-2 block w-full overflow-hidden rounded-lg ring-1 ring-slate-200"
+          title="클릭해 크게 보기"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={capture}
+            alt="학생 캡처"
+            className="max-h-40 w-full object-cover transition group-hover:opacity-90"
+          />
+          <span className="absolute bottom-1 right-1 rounded bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+            🔍 캡처
+          </span>
+        </button>
+      )}
+
       {warned && (
         <div className="mt-2 rounded-lg bg-red-50 px-2 py-1 text-xs font-semibold text-red-600">
           ⚠️ 필터링 경고 이력 있음
@@ -426,17 +473,6 @@ function StudentCard({
               <b>마지막 AI 힌트:</b> {detail.lastHint.slice(0, 80)}
               {detail.lastHint.length > 80 ? "…" : ""}
             </p>
-          )}
-          {detail?.attempt?.imageUrl && (
-            <div className="border-t border-slate-200 pt-1">
-              <b>최근 캡처:</b>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={detail.attempt.imageUrl}
-                alt="학생 캡처"
-                className="mt-1 max-h-36 rounded ring-1 ring-slate-200"
-              />
-            </div>
           )}
         </div>
       )}
