@@ -49,12 +49,6 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="mt-10 rounded-2xl bg-brand-50 p-6 text-sm text-brand-900 ring-1 ring-brand-100">
-          <b>💡 데모 모드 안내</b> — Firebase 설정이 없으면 이 브라우저
-          안에서만 데이터가 저장됩니다(localStorage). 학생 탭과 교사 탭을 같은
-          브라우저에서 열면 실시간 연동을 체험할 수 있어요. 실제 수업(여러 기기
-          동기화)에는 <code>.env</code>에 Firebase 설정을 채우세요.
-        </div>
       </div>
 
       <Footer />
