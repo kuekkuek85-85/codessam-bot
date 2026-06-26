@@ -82,7 +82,12 @@ node scripts/parse-sb3.mjs ./my-scratch-files > missions.json
 
 출력 JSON에서 사람이 보완할 칸(`level`, `answerText`, `bugPoints`, `sb3Url` 등)을
 채운 뒤 Realtime Database `missions` 경로에 업로드하세요.
-데모 모드 기본 미션 6개(상·중·하 × 2세트)는 `src/lib/missions.ts`에 있습니다.
+
+기본 미션 3종(상·중·하)은 실제 수업 .sb3를 기반으로 `src/lib/missions.ts`에
+들어 있고, 원본 파일은 `public/missions/{sang,jung,ha}.sb3`로 호스팅되어
+'미션 시작' 버튼이 내려받게 합니다(학생 디버깅 대상). 각 미션의
+`bugPoints`/`answerText`/`goalDescription`은 업로드 파일 분석 기반 추정값이라
+의도와 다르면 해당 파일만 고치면 됩니다.
 
 ---
 

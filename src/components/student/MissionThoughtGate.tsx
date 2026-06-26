@@ -61,12 +61,14 @@ export default function MissionThoughtGate({
         <p className="mt-2 text-slate-600">🎯 {mission.goalDescription}</p>
 
         <div className="mt-4 rounded-xl bg-slate-900 p-4 font-mono text-sm leading-relaxed text-slate-100">
-          <div className="mb-2 text-xs text-slate-400">스켈레톤 (빈칸 채우기)</div>
+          <div className="mb-2 text-xs text-slate-400">
+            현재 블록 (디버깅 대상 — 어디가 잘못됐을까?)
+          </div>
           <pre className="whitespace-pre-wrap">{mission.skeletonText}</pre>
         </div>
 
         <button className="btn-primary mt-4 w-full" onClick={startMission}>
-          ▶ 미션 시작 (스크래치 새 탭으로 열기)
+          ▶ 미션 시작 (.sb3 내려받기 → 스크래치에서 열기)
         </button>
         {started && (
           <p className="mt-2 text-center text-sm text-emerald-600">
