@@ -3,6 +3,7 @@
 import { useState } from "react";
 import GuardedTextarea from "./GuardedTextarea";
 import ImageCapture from "./ImageCapture";
+import { SEED_MISSIONS } from "@/lib/missions";
 import type { Attempt, Mission, Student, ThoughtGate } from "@/lib/types";
 
 // 화면 2. 미션 + 생각 게이트 (★ HITL 핵심) — PRD §5
@@ -63,6 +64,11 @@ export default function MissionThoughtGate({
     onSave(next);
   }
 
+  // 영상은 DB 미션에 없으면 코드 시드에서 보완(리시드 없이 재배포만으로 표시).
+  const seed = SEED_MISSIONS.find((m) => m.id === mission.id);
+  const debugVideoUrl = mission.debugVideoUrl ?? seed?.debugVideoUrl;
+  const targetVideoUrl = mission.targetVideoUrl ?? seed?.targetVideoUrl;
+
   return (
     <div className="space-y-6">
       <div className="card">
@@ -80,6 +86,39 @@ export default function MissionThoughtGate({
           {mission.title}
         </h1>
         <p className="mt-2 text-slate-600">🎯 {mission.goalDescription}</p>
+
+        {(debugVideoUrl || targetVideoUrl) && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {debugVideoUrl && (
+              <figure>
+                <figcaption className="mb-1 text-sm font-semibold text-red-600">
+                  🔴 초기 상태 (지금 — 문제 발생)
+                </figcaption>
+                <video
+                  src={debugVideoUrl}
+                  className="w-full rounded-xl bg-black ring-1 ring-slate-200"
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              </figure>
+            )}
+            {targetVideoUrl && (
+              <figure>
+                <figcaption className="mb-1 text-sm font-semibold text-emerald-600">
+                  🟢 목표 상태 (해결되면 이렇게)
+                </figcaption>
+                <video
+                  src={targetVideoUrl}
+                  className="w-full rounded-xl bg-black ring-1 ring-slate-200"
+                  controls
+                  playsInline
+                  preload="metadata"
+                />
+              </figure>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 rounded-xl bg-slate-900 p-4 font-mono text-sm leading-relaxed text-slate-100">
           <div className="mb-2 text-xs text-slate-400">

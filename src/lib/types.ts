@@ -40,6 +40,8 @@ export interface Mission {
   sb3Url: string; // 학생용 .sb3 (새 탭으로 여는 대상)
   goalDescription: string;
   videoUrl?: string;
+  debugVideoUrl?: string; // 초기 상태(문제 발생) 시연 영상 URL
+  targetVideoUrl?: string; // 목표 상태(해결 완료) 시연 영상 URL
 }
 
 export interface Student {

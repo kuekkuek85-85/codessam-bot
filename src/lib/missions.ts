@@ -53,6 +53,10 @@ export const SEED_MISSIONS: Mission[] = [
     ],
     conceptTags: ["변수", "감소 연산", "조건문", "신호(broadcast)"],
     sb3Url: "/missions/ha.sb3",
+    debugVideoUrl:
+      "https://u1.padletusercontent.com/uploads/padlet-uploads-usc1/2072096092/16b9adf54db08f7d1ce62e5da62b67f4/20260509_225928.mp4?token=p9Q3bfdrVav_OAuZYixzF9W0K45q-d-AwOVJnbY7KRaipn5f41v5G8mhQSELcUZ6D8kiFuYBbziqGQCyTKUSq105YIujet4aV0SYpzWpbXXAHHgCJo86KtWZwCatwUB7G1oHiaYvYImnxyCfijyMkH0U_6-8Az3e_rXWDekToFlJ0ke-dHAQK1nRPcDA1YFDdyq22mWr_cq3uRcd-LNJl89olEvQL5hvRiokKsoHRuxl9zBDoiVWucT3k0KdwZjK",
+    targetVideoUrl:
+      "https://u1.padletusercontent.com/uploads/padlet-uploads-usc1/2072096092/d1d11db2eba159dc1eb4eb78608db01a/20260509_230225.mp4?token=p9Q3bfdrVav_OAuZYixzF9W0K45q-d-AwOVJnbY7KRaipn5f41v5G8mhQSELcUZ6D8kiFuYBbziqGQCyTKUSq105YIujet4aV0SYpzWpbXXAHHgCJo86KtWZwCatwUB79lMvhdGbzV4K6iBErU6jfo-r6e7dCQNbRaxSs_L48DrR3V1YNe8_om9M0UrSKJoOZn2IVnNXRdVRFMsgaZ3pzolgEUhYyMIUcAZDgzqF4IZKX3Zd6Ib6ZLycybl6as5t",
     goalDescription:
       "timer up을 누르면 타이머가 5씩 증가하고, 스페이스바를 누르면 1씩 감소되며 0이 되면 우주선이 발사된다.",
   },
