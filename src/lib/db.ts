@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────
 // 데이터 레이어 추상화.
-// Firebase가 설정되어 있으면 Firestore 실시간, 아니면 localStorage 데모.
+// Firebase가 설정되어 있으면 Realtime Database 실시간, 아니면 localStorage 데모.
 // 두 구현 모두 동일한 DB 인터페이스를 만족한다.
 // ─────────────────────────────────────────────────────────────
 
@@ -16,7 +16,7 @@ import {
   type StudentState,
 } from "./types";
 import { SEED_MISSIONS, DEMO_SESSION_ID } from "./missions";
-import { FIREBASE_ENABLED, getDb } from "./firebase";
+import { FIREBASE_ENABLED, getRtdb } from "./firebase";
 
 export interface DB {
   /** 데모(localStorage) 모드 여부 */
@@ -263,198 +263,197 @@ class LocalDB implements DB {
 }
 
 // ════════════════════════════════════════════════════════════
-// Firestore 구현 (실서비스 모드).
+// Realtime Database 구현 (실서비스 모드).
+// 컬렉션 규모가 작아(한 차시 30명), 노드 전체를 읽어 JS에서 필터링한다.
+// → .indexOn 보안규칙 없이도 동작하고 실시간(onValue) 구독을 단순화.
 // ════════════════════════════════════════════════════════════
 
-class FirestoreDB implements DB {
+class RealtimeDB implements DB {
   demo = false;
 
-  private async fs() {
-    const db = getDb();
-    if (!db) throw new Error("Firestore not initialized");
-    const mod = await import("firebase/firestore");
+  private async rt() {
+    const db = getRtdb();
+    if (!db) throw new Error("Realtime Database not initialized");
+    const mod = await import("firebase/database");
     return { db, ...mod };
   }
 
+  /** 노드 전체를 객체맵으로 읽어 배열로 변환 */
+  private async readColl<T>(path: string): Promise<T[]> {
+    const { db, ref, get } = await this.rt();
+    const snap = await get(ref(db, path));
+    const val = snap.val() as Record<string, T> | null;
+    return val ? Object.values(val) : [];
+  }
+
   async ensureSeed() {
-    const { db, collection, getDocs, query, where, writeBatch, doc } =
-      await this.fs();
-    const q = query(
-      collection(db, "missions"),
-      where("sessionId", "==", DEMO_SESSION_ID)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) {
-      const batch = writeBatch(db);
-      for (const m of SEED_MISSIONS) {
-        batch.set(doc(db, "missions", m.id), m);
-      }
-      await batch.commit();
+    const missions = await this.readColl<Mission>("missions");
+    const has = missions.some((m) => m.sessionId === DEMO_SESSION_ID);
+    if (!has) {
+      const { db, ref, update } = await this.rt();
+      const updates: Record<string, Mission> = {};
+      for (const m of SEED_MISSIONS) updates[`missions/${m.id}`] = m;
+      await update(ref(db), updates);
     }
   }
 
   async listMissions(sessionId: string) {
-    const { db, collection, getDocs, query, where } = await this.fs();
-    const snap = await getDocs(
-      query(collection(db, "missions"), where("sessionId", "==", sessionId))
-    );
-    return snap.docs.map((d) => d.data() as Mission);
+    const all = await this.readColl<Mission>("missions");
+    return all.filter((m) => m.sessionId === sessionId);
   }
   async getMission(missionId: string) {
-    const { db, doc, getDoc } = await this.fs();
-    const d = await getDoc(doc(db, "missions", missionId));
-    return d.exists() ? (d.data() as Mission) : null;
+    const { db, ref, get } = await this.rt();
+    const snap = await get(ref(db, `missions/${missionId}`));
+    return snap.exists() ? (snap.val() as Mission) : null;
   }
 
   async upsertStudent(st: Student) {
-    const { db, doc, setDoc } = await this.fs();
-    await setDoc(doc(db, "students", st.id), st);
+    const { db, ref, set } = await this.rt();
+    await set(ref(db, `students/${st.id}`), st);
   }
   async getStudent(id: string) {
-    const { db, doc, getDoc } = await this.fs();
-    const d = await getDoc(doc(db, "students", id));
-    return d.exists() ? (d.data() as Student) : null;
+    const { db, ref, get } = await this.rt();
+    const snap = await get(ref(db, `students/${id}`));
+    return snap.exists() ? (snap.val() as Student) : null;
   }
   async findStudent(sessionId: string, studentNo: string, name: string) {
-    const { db, collection, getDocs, query, where } = await this.fs();
-    const snap = await getDocs(
-      query(
-        collection(db, "students"),
-        where("sessionId", "==", sessionId),
-        where("studentNo", "==", studentNo),
-        where("name", "==", name)
-      )
+    const all = await this.readColl<Student>("students");
+    return (
+      all.find(
+        (x) =>
+          x.sessionId === sessionId &&
+          x.studentNo === studentNo &&
+          x.name === name
+      ) ?? null
     );
-    return snap.empty ? null : (snap.docs[0].data() as Student);
   }
   async updateStudent(id: string, patch: Partial<Student>) {
-    const { db, doc, updateDoc } = await this.fs();
-    await updateDoc(doc(db, "students", id), patch as Record<string, unknown>);
+    const { db, ref, update } = await this.rt();
+    await update(ref(db, `students/${id}`), patch as Record<string, unknown>);
   }
   subscribeStudents(sessionId: string, cb: (rows: Student[]) => void) {
-    let unsub = () => {};
+    let off = () => {};
     let cancelled = false;
-    this.fs().then(({ db, collection, query, where, onSnapshot }) => {
+    this.rt().then(({ db, ref, onValue }) => {
       if (cancelled) return;
-      const q = query(
-        collection(db, "students"),
-        where("sessionId", "==", sessionId)
-      );
       // 시간 기반 상태(막힘/붕뜸)는 교사 페이지의 now 틱이 재계산한다.
-      unsub = onSnapshot(q, (snap) => {
+      off = onValue(ref(db, "students"), (snap) => {
+        const val = snap.val() as Record<string, Student> | null;
+        const rows = val ? Object.values(val) : [];
         cb(
-          snap.docs
-            .map((d) => d.data() as Student)
+          rows
+            .filter((x) => x.sessionId === sessionId)
             .sort((a, b) => a.studentNo.localeCompare(b.studentNo))
         );
       });
     });
     return () => {
       cancelled = true;
-      unsub();
+      off();
     };
   }
 
   async createAttempt(a: Attempt) {
-    const { db, doc, setDoc } = await this.fs();
-    await setDoc(doc(db, "attempts", a.id), a);
+    const { db, ref, set } = await this.rt();
+    await set(ref(db, `attempts/${a.id}`), a);
   }
   async getAttempt(id: string) {
-    const { db, doc, getDoc } = await this.fs();
-    const d = await getDoc(doc(db, "attempts", id));
-    return d.exists() ? (d.data() as Attempt) : null;
+    const { db, ref, get } = await this.rt();
+    const snap = await get(ref(db, `attempts/${id}`));
+    return snap.exists() ? (snap.val() as Attempt) : null;
   }
   async updateAttempt(id: string, patch: Partial<Attempt>) {
-    const { db, doc, updateDoc } = await this.fs();
-    await updateDoc(doc(db, "attempts", id), patch as Record<string, unknown>);
+    const { db, ref, update } = await this.rt();
+    await update(ref(db, `attempts/${id}`), patch as Record<string, unknown>);
   }
 
   async latestAttempt(studentId: string) {
-    const { db, collection, getDocs, query, where } = await this.fs();
-    const snap = await getDocs(
-      query(collection(db, "attempts"), where("studentId", "==", studentId))
-    );
-    const rows = snap.docs
-      .map((d) => d.data() as Attempt)
+    const all = await this.readColl<Attempt>("attempts");
+    const rows = all
+      .filter((a) => a.studentId === studentId)
       .sort((a, b) => b.startedAt - a.startedAt);
     return rows[0] ?? null;
   }
   async lastAiHint(studentId: string) {
-    const { db, collection, getDocs, query, where } = await this.fs();
-    const snap = await getDocs(
-      query(
-        collection(db, "messages"),
-        where("studentId", "==", studentId),
-        where("role", "==", "ai")
-      )
-    );
-    const rows = snap.docs
-      .map((d) => d.data() as Message)
+    const all = await this.readColl<Message>("messages");
+    const rows = all
+      .filter((m) => m.studentId === studentId && m.role === "ai")
       .sort((a, b) => b.createdAt - a.createdAt);
     return rows[0]?.text ?? null;
   }
 
   async addMessage(m: Message) {
-    const { db, doc, setDoc } = await this.fs();
-    await setDoc(doc(db, "messages", m.id), m);
+    const { db, ref, set } = await this.rt();
+    await set(ref(db, `messages/${m.id}`), m);
   }
   async listMessages(attemptId: string) {
-    const { db, collection, getDocs, query, where } = await this.fs();
-    const snap = await getDocs(
-      query(collection(db, "messages"), where("attemptId", "==", attemptId))
-    );
-    return snap.docs
-      .map((d) => d.data() as Message)
+    const all = await this.readColl<Message>("messages");
+    return all
+      .filter((x) => x.attemptId === attemptId)
       .sort((a, b) => a.createdAt - b.createdAt);
   }
 
   async addWarning(w: Warning) {
-    const { db, doc, setDoc } = await this.fs();
-    await setDoc(doc(db, "warnings", w.id), w);
+    const { db, ref, set } = await this.rt();
+    await set(ref(db, `warnings/${w.id}`), w);
   }
   subscribeWarnings(sessionId: string, cb: (rows: Warning[]) => void) {
-    let unsub = () => {};
+    let offS = () => {};
+    let offW = () => {};
     let cancelled = false;
-    this.fs().then(
-      async ({ db, collection, query, where, onSnapshot, getDocs }) => {
-        if (cancelled) return;
-        const sSnap = await getDocs(
-          query(collection(db, "students"), where("sessionId", "==", sessionId))
-        );
-        const ids = new Set(sSnap.docs.map((d) => d.id));
-        unsub = onSnapshot(collection(db, "warnings"), (snap) => {
-          cb(
-            snap.docs
-              .map((d) => d.data() as Warning)
-              .filter((w) => ids.has(w.studentId))
-              .sort((a, b) => b.createdAt - a.createdAt)
-          );
-        });
-      }
-    );
+    let students: Student[] = [];
+    let warnings: Warning[] = [];
+    const recompute = () => {
+      const ids = new Set(
+        students.filter((s) => s.sessionId === sessionId).map((s) => s.id)
+      );
+      cb(
+        warnings
+          .filter((w) => ids.has(w.studentId))
+          .sort((a, b) => b.createdAt - a.createdAt)
+      );
+    };
+    this.rt().then(({ db, ref, onValue }) => {
+      if (cancelled) return;
+      offS = onValue(ref(db, "students"), (snap) => {
+        const v = snap.val() as Record<string, Student> | null;
+        students = v ? Object.values(v) : [];
+        recompute();
+      });
+      offW = onValue(ref(db, "warnings"), (snap) => {
+        const v = snap.val() as Record<string, Warning> | null;
+        warnings = v ? Object.values(v) : [];
+        recompute();
+      });
+    });
     return () => {
       cancelled = true;
-      unsub();
+      offS();
+      offW();
     };
   }
 
   async clearAll(sessionId: string) {
-    const { db, collection, getDocs, query, where, writeBatch } =
-      await this.fs();
-    const sSnap = await getDocs(
-      query(collection(db, "students"), where("sessionId", "==", sessionId))
+    const { db, ref, update } = await this.rt();
+    const students = await this.readColl<Student>("students");
+    const ids = new Set(
+      students.filter((s) => s.sessionId === sessionId).map((s) => s.id)
     );
-    const ids = new Set(sSnap.docs.map((d) => d.id));
-    const batch = writeBatch(db);
-    sSnap.docs.forEach((d) => batch.delete(d.ref));
-    for (const coll of ["attempts", "messages", "warnings"]) {
-      const cs = await getDocs(collection(db, coll));
-      cs.docs.forEach((d) => {
-        const sid = (d.data() as { studentId?: string }).studentId;
-        if (sid && ids.has(sid)) batch.delete(d.ref);
-      });
+    const updates: Record<string, null> = {};
+    for (const s of students) {
+      if (s.sessionId === sessionId) updates[`students/${s.id}`] = null;
     }
-    await batch.commit();
+    for (const coll of ["attempts", "messages", "warnings"] as const) {
+      const rows = await this.readColl<{ id: string; studentId?: string }>(
+        coll
+      );
+      for (const row of rows) {
+        if (row.studentId && ids.has(row.studentId)) {
+          updates[`${coll}/${row.id}`] = null;
+        }
+      }
+    }
+    await update(ref(db), updates);
   }
 }
 
@@ -462,7 +461,7 @@ class FirestoreDB implements DB {
 let _instance: DB | null = null;
 export function db(): DB {
   if (_instance) return _instance;
-  _instance = FIREBASE_ENABLED ? new FirestoreDB() : new LocalDB();
+  _instance = FIREBASE_ENABLED ? new RealtimeDB() : new LocalDB();
   return _instance;
 }
 

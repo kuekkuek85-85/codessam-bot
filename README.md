@@ -23,7 +23,7 @@
 ## 기술 스택
 
 - **Next.js 14 (App Router) + TypeScript + Tailwind CSS**
-- **Firebase / Firestore** — 실시간 대시보드 (선택)
+- **Firebase / Realtime Database** — 실시간 대시보드 (선택)
 - **Gemini API** — 단계 힌트·검증·도전 생성 (선택, 없으면 더미 폴백)
 - **Vercel** 배포 권장
 
@@ -54,10 +54,20 @@ npm run dev
 cp .env.example .env.local
 ```
 
-- **Firebase**: 6개 `NEXT_PUBLIC_FIREBASE_*` 값을 채우면 자동으로 Firestore 실시간 모드로 전환됩니다.
+- **Firebase**: `NEXT_PUBLIC_FIREBASE_*` 값(특히 `DATABASE_URL`)을 채우면 자동으로 Realtime Database 실시간 모드로 전환됩니다.
 - **Gemini**: `GEMINI_API_KEY`를 채우면 실제 AI 힌트가, 없으면 더미 응답이 나옵니다.
 
-Firestore 보안 규칙은 수업 환경(로그인 없음)에 맞춰 세션 코드 기반으로 별도 설정하세요.
+### Realtime Database 보안 규칙
+
+이 앱은 로그인이 없어, RTDB 규칙이 닫혀 있으면 학생/교사 화면이 데이터를 읽지
+못합니다. 저장소의 `database.rules.json`을 Firebase 콘솔
+(Realtime Database → 규칙)에 붙여넣으세요. 수업이 끝나면 규칙을 닫거나
+대시보드의 "전체 삭제"로 데이터를 비우는 것을 권장합니다.
+
+```bash
+# firebase-tools를 쓴다면
+firebase deploy --only database
+```
 
 ---
 
@@ -71,7 +81,7 @@ node scripts/parse-sb3.mjs ./my-scratch-files > missions.json
 ```
 
 출력 JSON에서 사람이 보완할 칸(`level`, `answerText`, `bugPoints`, `sb3Url` 등)을
-채운 뒤 Firestore `missions` 컬렉션에 업로드하세요.
+채운 뒤 Realtime Database `missions` 경로에 업로드하세요.
 데모 모드 기본 미션 6개(상·중·하 × 2세트)는 `src/lib/missions.ts`에 있습니다.
 
 ---
@@ -89,8 +99,8 @@ src/
     Footer.tsx          운영정보·처리방침·약관 (PRD §11)
     student/            6개 화면 컴포넌트 + 안전필터 입력
   lib/
-    types.ts            도메인 타입 (Firestore 모델)
-    db.ts               데이터 레이어 (Firestore ↔ localStorage)
+    types.ts            도메인 타입 (PRD §8 데이터 모델)
+    db.ts               데이터 레이어 (Realtime Database ↔ localStorage)
     firebase.ts         Firebase 초기화(선택)
     gemini.ts           모드별 시스템 프롬프트 + 더미 (PRD §9)
     filter.ts           욕설·개인정보 1차 규칙 엔진 (PRD §10)

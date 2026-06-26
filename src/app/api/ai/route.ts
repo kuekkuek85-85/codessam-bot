@@ -12,7 +12,7 @@ import {
 
 export const runtime = "nodejs";
 
-const MODEL = process.env.GEMINI_MODEL || "gemini-1.5-flash";
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 export async function POST(req: Request) {
   let body: AiRequest;
@@ -45,7 +45,13 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: userTurn }] }],
-        generationConfig: { temperature: 0.7, maxOutputTokens: 400 },
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 500,
+          // Gemini 2.5는 thinking 모델 — 빠른 응답·짧은 힌트를 위해 thinking 끔.
+          // (2.5가 아닌 모델은 이 필드를 무시함)
+          thinkingConfig: { thinkingBudget: 0 },
+        },
       }),
     });
 

@@ -222,7 +222,9 @@ export default function TeacherPage() {
                   설정 필요
                 </span>
               ) : (
-                <span className="text-emerald-600">● Firestore 실시간 연결</span>
+                <span className="text-emerald-600">
+                  ● Realtime Database 실시간 연결
+                </span>
               )}
             </p>
           </div>
