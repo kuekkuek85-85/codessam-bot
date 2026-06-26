@@ -36,10 +36,25 @@ export default function MissionThoughtGate({
     tg.did.trim() !== "" &&
     tg.happened.trim() !== "";
 
-  function startMission() {
-    window.open(mission.sb3Url, "_blank", "noopener");
-    onStart();
-    setStarted(true);
+  // 두 버튼 중 무엇을 먼저 눌러도 한 번만 시작 처리(중복 attempt 방지).
+  function begin() {
+    if (!started) {
+      onStart();
+      setStarted(true);
+    }
+  }
+  function downloadProblem() {
+    const a = document.createElement("a");
+    a.href = mission.sb3Url;
+    a.download = mission.sb3Url.split("/").pop() || "mission.sb3";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    begin();
+  }
+  function openScratch() {
+    window.open("https://scratch.mit.edu/projects/editor/", "_blank", "noopener");
+    begin();
   }
 
   function update(patch: Partial<ThoughtGate>) {
@@ -66,6 +81,43 @@ export default function MissionThoughtGate({
         </h1>
         <p className="mt-2 text-slate-600">🎯 {mission.goalDescription}</p>
 
+        {(mission.debugVideoUrl || mission.targetVideoUrl) && (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            {mission.debugVideoUrl && (
+              <figure>
+                <figcaption className="mb-1 text-sm font-semibold text-red-600">
+                  🔴 초기 상태 (지금 — 버그)
+                </figcaption>
+                <video
+                  src={mission.debugVideoUrl}
+                  className="w-full rounded-xl ring-1 ring-slate-200"
+                  controls
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                />
+              </figure>
+            )}
+            {mission.targetVideoUrl && (
+              <figure>
+                <figcaption className="mb-1 text-sm font-semibold text-emerald-600">
+                  🟢 목표 상태 (이렇게 되어야 해요)
+                </figcaption>
+                <video
+                  src={mission.targetVideoUrl}
+                  className="w-full rounded-xl ring-1 ring-slate-200"
+                  controls
+                  muted
+                  loop
+                  playsInline
+                  preload="metadata"
+                />
+              </figure>
+            )}
+          </div>
+        )}
+
         <div className="mt-4 rounded-xl bg-slate-900 p-4 font-mono text-sm leading-relaxed text-slate-100">
           <div className="mb-2 text-xs text-slate-400">
             현재 블록 (디버깅 대상 — 어디가 잘못됐을까?)
@@ -73,9 +125,18 @@ export default function MissionThoughtGate({
           <pre className="whitespace-pre-wrap">{mission.skeletonText}</pre>
         </div>
 
-        <button className="btn-primary mt-4 w-full" onClick={startMission}>
-          ▶ 미션 시작 (.sb3 내려받기 → 스크래치에서 열기)
-        </button>
+        <div className="mt-4 grid gap-2 sm:grid-cols-2">
+          <button className="btn-primary" onClick={downloadProblem}>
+            ⬇ 문제 파일 다운로드 (.sb3)
+          </button>
+          <button className="btn-ghost" onClick={openScratch}>
+            🔗 스크래치 사이트 열기
+          </button>
+        </div>
+        <p className="mt-2 text-center text-xs text-slate-400">
+          ① 문제 파일을 내려받고 ② 스크래치에서 열어(파일 → 컴퓨터에서 가져오기)
+          고쳐보세요.
+        </p>
         {started && (
           <p className="mt-2 text-center text-sm text-emerald-600">
             ✓ 시작했어요. 스크래치에서 고쳐본 뒤, 막히면 아래 생각 게이트를

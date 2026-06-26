@@ -53,6 +53,8 @@ export const SEED_MISSIONS: Mission[] = [
     ],
     conceptTags: ["변수", "감소 연산", "조건문", "신호(broadcast)"],
     sb3Url: "/missions/ha.sb3",
+    debugVideoUrl: "/missions/ha-debug.mp4",
+    targetVideoUrl: "/missions/ha-target.mp4",
     goalDescription:
       "timer up을 누르면 타이머가 5씩 증가하고, 스페이스바를 누르면 1씩 감소되며 0이 되면 우주선이 발사된다.",
   },
