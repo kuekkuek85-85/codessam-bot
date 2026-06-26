@@ -28,24 +28,56 @@ const OPCODES = {
   control_repeat: "{TIMES} 번 반복하기",
   control_forever: "무한 반복하기",
   control_if: "만약 {CONDITION} (이)라면",
-  control_if_else: "만약 {CONDITION} (이)라면 / 아니면",
+  control_if_else: "만약 {CONDITION} (이)라면",
   control_repeat_until: "{CONDITION} 까지 반복하기",
+  control_wait_until: "{CONDITION} 까지 기다리기",
+  control_stop: "{STOP_OPTION} 멈추기",
+  event_broadcast: "{BROADCAST_INPUT} 신호 보내기",
+  event_broadcastandwait: "{BROADCAST_INPUT} 신호 보내고 기다리기",
+  event_whenbroadcastreceived: "{BROADCAST_OPTION} 신호를 받았을 때",
   motion_movesteps: "{STEPS} 만큼 움직이기",
   motion_turnright: "시계방향으로 {DEGREES} 도 돌기",
   motion_turnleft: "반시계방향으로 {DEGREES} 도 돌기",
   motion_pointindirection: "{DIRECTION} 도 방향 보기",
   motion_gotoxy: "x:{X} y:{Y} 로 이동하기",
+  motion_glidesecstoxy: "{SECS} 초 동안 x:{X} y:{Y} (으)로 이동하기",
+  motion_changexby: "x 좌표를 {DX} 만큼 바꾸기",
+  motion_setx: "x 좌표를 {X} 로 정하기",
   motion_changeyby: "y 좌표를 {DY} 만큼 바꾸기",
   motion_sety: "y 좌표를 {Y} 로 정하기",
   motion_ifonedgebounce: "벽에 닿으면 튕기기",
   looks_say: "{MESSAGE} 말하기",
   looks_sayforsecs: "{MESSAGE} 을(를) {SECS} 초 동안 말하기",
-  sound_play: "소리 재생하기",
-  sound_playuntildone: "끝까지 소리 재생하기",
+  looks_think: "{MESSAGE} 생각하기",
+  looks_show: "보이기",
+  looks_hide: "숨기기",
+  looks_switchcostumeto: "모양을 {COSTUME} (으)로 바꾸기",
+  looks_nextcostume: "다음 모양으로 바꾸기",
+  looks_switchbackdropto: "배경을 {BACKDROP} (으)로 바꾸기",
+  looks_nextbackdrop: "다음 배경으로 바꾸기",
+  sound_play: "{SOUND_MENU} 소리 재생하기",
+  sound_playuntildone: "{SOUND_MENU} 끝까지 소리 재생하기",
   data_setvariableto: "{VARIABLE} 를 {VALUE} 로 정하기",
   data_changevariableby: "{VARIABLE} 를 {VALUE} 만큼 바꾸기",
+  data_showvariable: "{VARIABLE} 변수 보이기",
+  data_hidevariable: "{VARIABLE} 변수 숨기기",
   sensing_askandwait: "{QUESTION} 묻고 기다리기",
-  sensing_touchingobject: "{TOUCHINGOBJECTMENU} 에 닿았는가",
+  // ── 보고(reporter)/판단 블록: 조건·입력 안에서 인라인으로 렌더 ──
+  sensing_touchingobject: "{TOUCHINGOBJECTMENU} 에 닿았나",
+  sensing_timer: "타이머",
+  sensing_mousedown: "마우스를 클릭했나",
+  sensing_answer: "대답",
+  operator_lt: "{OPERAND1} < {OPERAND2}",
+  operator_gt: "{OPERAND1} > {OPERAND2}",
+  operator_equals: "{OPERAND1} = {OPERAND2}",
+  operator_and: "{OPERAND1} 그리고 {OPERAND2}",
+  operator_or: "{OPERAND1} 또는 {OPERAND2}",
+  operator_not: "{OPERAND} 아님",
+  operator_add: "{NUM1} + {NUM2}",
+  operator_subtract: "{NUM1} - {NUM2}",
+  operator_multiply: "{NUM1} × {NUM2}",
+  operator_divide: "{NUM1} ÷ {NUM2}",
+  operator_join: "{STRING1} 와(과) {STRING2} 합치기",
 };
 
 function inputText(blocks, input) {
@@ -69,7 +101,17 @@ function fieldText(block, name) {
 function renderBlock(blocks, id, depth = 0) {
   const block = blocks[id];
   if (!block) return "";
-  let tmpl = OPCODES[block.opcode] || `(${block.opcode})`;
+
+  let tmpl = OPCODES[block.opcode];
+  if (!tmpl) {
+    // 메뉴/드롭다운 그림자 블록(입력 없이 필드 1개): 값만 인라인 반환.
+    const fieldKeys = Object.keys(block.fields || {});
+    const inputKeys = Object.keys(block.inputs || {});
+    if (fieldKeys.length === 1 && inputKeys.length === 0) {
+      return String(block.fields[fieldKeys[0]][0] ?? "");
+    }
+    tmpl = `(${block.opcode})`;
+  }
 
   // {NAME} 치환: fields 우선, 없으면 inputs
   tmpl = tmpl.replace(/\{(\w+)\}/g, (_, key) => {
@@ -81,11 +123,17 @@ function renderBlock(blocks, id, depth = 0) {
   const indent = "  ".repeat(depth);
   let out = indent + tmpl + "\n";
 
-  // 감싸는 블록(SUBSTACK)
-  for (const sub of ["SUBSTACK", "SUBSTACK2"]) {
-    const inp = block.inputs?.[sub];
-    if (inp && typeof inp[1] === "string") {
-      out += renderBlock(blocks, inp[1], depth + 1);
+  // 감싸는 블록(SUBSTACK = 참 가지)
+  const sub1 = block.inputs?.SUBSTACK;
+  if (sub1 && typeof sub1[1] === "string") {
+    out += renderBlock(blocks, sub1[1], depth + 1);
+  }
+  // if/else 의 거짓 가지
+  if (block.opcode === "control_if_else") {
+    out += indent + "아니면\n";
+    const sub2 = block.inputs?.SUBSTACK2;
+    if (sub2 && typeof sub2[1] === "string") {
+      out += renderBlock(blocks, sub2[1], depth + 1);
     }
   }
 
