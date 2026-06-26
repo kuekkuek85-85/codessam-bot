@@ -23,6 +23,8 @@ export interface DB {
   readonly demo: boolean;
 
   ensureSeed(): Promise<void>;
+  /** 미션을 코드의 최신 시드로 강제 재설정(기존 미션 목록을 덮어씀). */
+  reseedMissions(): Promise<void>;
 
   listMissions(sessionId: string): Promise<Mission[]>;
   getMission(missionId: string): Promise<Mission | null>;
@@ -133,6 +135,11 @@ class LocalDB implements DB {
       s.missions = SEED_MISSIONS.map((m) => ({ ...m }));
       this.write(s);
     }
+  }
+  async reseedMissions() {
+    const s = this.read();
+    s.missions = SEED_MISSIONS.map((m) => ({ ...m }));
+    this.write(s);
   }
 
   async listMissions(sessionId: string) {
@@ -325,6 +332,13 @@ class RealtimeDB implements DB {
       for (const m of SEED_MISSIONS) updates[`missions/${m.id}`] = m;
       await update(ref(db), updates);
     }
+  }
+  async reseedMissions() {
+    const { db, ref, set } = await this.rt();
+    // missions 노드 전체를 코드 최신 시드로 교체(옛 미션 제거).
+    const map: Record<string, Mission> = {};
+    for (const m of SEED_MISSIONS) map[m.id] = m;
+    await set(ref(db, "missions"), map);
   }
 
   async listMissions(sessionId: string) {

@@ -169,6 +169,19 @@ export default function TeacherPage() {
     URL.revokeObjectURL(url);
   }
 
+  async function reseed() {
+    if (
+      !confirm(
+        "미션을 코드의 최신 시드(상·중·하)로 다시 심습니다. DB의 기존 미션 목록을 덮어써요. 계속할까요?"
+      )
+    )
+      return;
+    await db().reseedMissions();
+    alert(
+      "미션을 다시 심었어요. 학생은 새로고침(또는 다시 시작)하면 새 미션이 보입니다."
+    );
+  }
+
   async function clearAll() {
     if (
       !confirm(
@@ -255,6 +268,9 @@ export default function TeacherPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button className="btn-ghost" onClick={reseed}>
+              🔄 미션 다시 심기
+            </button>
             <button className="btn-ghost" onClick={exportCsv}>
               ⬇ CSV 내보내기
             </button>
