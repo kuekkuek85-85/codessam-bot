@@ -9,9 +9,9 @@ export const SITE = {
   appName: "코드쌤봇 2.0",
   schoolName: "장평중학교",
   department: "정보과",
-  managerName: "담당 교사",
+  managerName: "이승엽",
   managerTitle: "정보 교사",
-  managerContact: "school@example.com",
+  managerContact: "kuekkuek85@naver.com",
   year: 2026,
 };
 
