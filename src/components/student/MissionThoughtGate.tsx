@@ -3,6 +3,7 @@
 import { useState } from "react";
 import GuardedTextarea from "./GuardedTextarea";
 import ImageCapture from "./ImageCapture";
+import { SEED_MISSIONS } from "@/lib/missions";
 import type { Attempt, Mission, Student, ThoughtGate } from "@/lib/types";
 
 // 화면 2. 미션 + 생각 게이트 (★ HITL 핵심) — PRD §5
@@ -63,6 +64,11 @@ export default function MissionThoughtGate({
     onSave(next);
   }
 
+  // 영상은 DB 미션에 없으면 코드 시드에서 보완(리시드 타이밍과 무관하게 표시).
+  const seed = SEED_MISSIONS.find((m) => m.id === mission.id);
+  const debugVideoUrl = mission.debugVideoUrl ?? seed?.debugVideoUrl;
+  const targetVideoUrl = mission.targetVideoUrl ?? seed?.targetVideoUrl;
+
   return (
     <div className="space-y-6">
       <div className="card">
@@ -81,15 +87,15 @@ export default function MissionThoughtGate({
         </h1>
         <p className="mt-2 text-slate-600">🎯 {mission.goalDescription}</p>
 
-        {(mission.debugVideoUrl || mission.targetVideoUrl) && (
+        {(debugVideoUrl || targetVideoUrl) && (
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {mission.debugVideoUrl && (
+            {debugVideoUrl && (
               <figure>
                 <figcaption className="mb-1 text-sm font-semibold text-red-600">
                   🔴 초기 상태 (지금 — 버그)
                 </figcaption>
                 <video
-                  src={mission.debugVideoUrl}
+                  src={debugVideoUrl}
                   className="w-full rounded-xl ring-1 ring-slate-200"
                   controls
                   muted
@@ -99,13 +105,13 @@ export default function MissionThoughtGate({
                 />
               </figure>
             )}
-            {mission.targetVideoUrl && (
+            {targetVideoUrl && (
               <figure>
                 <figcaption className="mb-1 text-sm font-semibold text-emerald-600">
                   🟢 목표 상태 (이렇게 되어야 해요)
                 </figcaption>
                 <video
-                  src={mission.targetVideoUrl}
+                  src={targetVideoUrl}
                   className="w-full rounded-xl ring-1 ring-slate-200"
                   controls
                   muted
